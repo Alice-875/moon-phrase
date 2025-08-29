@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Moon Phases — Live</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html { scroll-behavior: smooth; }
+  </style>
+</head>
+<body class="bg-gradient-to-b from-slate-50 to-white text-slate-800">
+  <!-- Top Toolbar -->
+  <div id="toolbar" class="w-full bg-indigo-700 text-white px-4 py-2 flex items-center justify-center gap-4 sticky top-0 z-50"></div>
+
+  <!-- Settings Row -->
+  <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-end gap-6">
+    <label class="flex items-center gap-2 text-sm">
+      <input id="toggleMoonIcons" type="checkbox" checked>
+      <span>Use Moon Icons</span>
+    </label>
+    <button id="langBtn" class="px-3 py-1.5 rounded-lg border border-gray-200 shadow bg-white text-xs">中文</button>
+  </div>
+
+  <!-- HERO -->
+  <section id="home" class="relative overflow-hidden">
+    <div class="max-w-6xl mx-auto px-4 py-16 grid md:grid-cols-2 gap-10 items-center">
+      <div>
+        <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight">
+          <span id="heroTitleA">Understand </span><span class="text-indigo-600" id="heroTitleB">Moon Phases</span>
+        </h1>
+        <p id="heroSub" class="mt-4 text-lg text-slate-600">
+          A friendly, interactive guide to how and why the Moon changes shape in our sky.
+        </p>
+        <div class="mt-6 flex flex-wrap items-center gap-3 text-xs" id="heroBadges"></div>
+      </div>
+      <div class="flex justify-center">
+        <div id="heroMoon" class="drop-shadow-lg"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Interactive controls -->
+  <section id="interactive" class="max-w-6xl mx-auto px-4 py-10">
+    <div class="rounded-2xl shadow-lg border border-gray-200 bg-white p-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="text-xl font-semibold" id="phaseName">—</div>
+          <div class="text-slate-600 mt-1" id="illumRow">Illumination: —</div>
+          <div class="text-slate-600" id="ageRow">Age since New Moon: —</div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="prevBtn" class="px-3 py-2 rounded-xl border shadow bg-white">◀︎ Prev day</button>
+          <input id="dateInput" type="date" class="px-3 py-2 rounded-xl border shadow bg-white">
+          <button id="nextBtn" class="px-3 py-2 rounded-xl border shadow bg-white">Next day ▶︎</button>
+        </div>
+      </div>
+
+      <div class="mt-6 flex items-center gap-6">
+        <div id="mainMoon"></div>
+        <div class="flex-1">
+          <div class="text-sm text-slate-600 mb-2">Click a mini‑phase to jump ±15 days</div>
+          <div id="miniStrip" class="grid grid-cols-6 sm:grid-cols-12 gap-3"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Facts -->
+  <section id="facts" class="max-w-6xl mx-auto px-4 py-16">
+    <h2 id="factsTitle" class="text-3xl font-bold mb-6">10 Fun Facts about the Moon</h2>
+    <div id="factsGrid" class="grid md:grid-cols-2 gap-6"></div>
+  </section>
+
+  <footer class="text-center text-xs text-slate-500 pb-10">
+    <div>Images courtesy of NASA SVS dataset. Educational use.</div>
+  </footer>
+
+<script>
+// --- Moon math ---
+const SYNODIC_MONTH = 29.530588853;
+const NEW_MOON_REF = Date.UTC(2000, 0, 6, 18, 14, 0);
+function daysSinceRef(date) {
+  return (Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) - NEW_MOON_REF) / 86400000;
+}
+function normalizePhase(age) { let p = age % SYNODIC_MONTH; if (p < 0) p += SYNODIC_MONTH; return p; }
+function phaseInfo(date) {
+  const d = daysSinceRef(date);
+  const age = normalizePhase(d);
+  const phase = age / SYNODIC_MONTH;
+  const angle = phase * 2 * Math.PI;
+  const illumination = (1 - Math.cos(angle)) / 2;
+  const namesEN = ["New Moon","Waxing Crescent","First Quarter","Waxing Gibbous","Full Moon","Waning Gibbous","Last Quarter","Waning Crescent"];
+  const namesCN = ["新月","娥眉月","上弦月","盈凸月","满月","亏凸月","下弦月","残月"];
+  const idx = Math.round((phase * 8)) % 8;
+  return {age, phase, angle, illumination, nameEN: namesEN[idx], nameCN: namesCN[idx]};
+}
+function moonImageURL(date) {
+  const d = daysSinceRef(date);
+  const age = normalizePhase(d);
+  const dayIndex = Math.round(age);
+  const padded = String(dayIndex + 1).padStart(4, "0");
+  return `https://svs.gsfc.nasa.gov/vis/a000000/a004800/a004804/frames/730x730_1x1_30p/moon.${padded}.jpg`;
+}
+function liveMoonEl(date, size=160, tilt=-12) {
+  const url = moonImageURL(date);
+  const wrap = document.createElement('div');
+  wrap.style.width = size + 'px';
+  wrap.style.height = size + 'px';
+  wrap.style.transform = `rotate(${tilt}deg)`;
+  wrap.className = 'rounded-full overflow-hidden shadow-lg bg-black flex items-center justify-center';
+  const img = document.createElement('img');
+  img.src = url;
+  img.alt = 'Moon';
+  img.style.width = '100%';
+  img.style.height = '100%';
+  img.style.objectFit = 'cover';
+  wrap.appendChild(img);
+  return wrap;
+}
+function addDays(d, n){ const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+function fmtPct(x){ return Math.round(x*100) + '%'; }
+
+// --- Language + facts ---
+let lang = 'en';
+const funFactsEN = [
+  "The Moon always shows the same face to Earth — we never see the far side.",
+  "A lunar day (sunrise to sunrise) lasts about 29.5 Earth days.",
+  "The Moon is drifting away from Earth at about 3.8 cm per year.",
+  "There is no atmosphere on the Moon, so the sky is always black.",
+  "The footprints left by Apollo astronauts are still visible today.",
+  "A total lunar eclipse can only happen during a full moon.",
+  "The Moon is about 1/4 the diameter of Earth.",
+  "The term 'blue moon' refers to the second full moon in a calendar month.",
+  "Ancient calendars were often based on the cycles of the Moon.",
+  "The far side of the Moon has more craters than the side facing Earth."
+];
+const funFactsCN = [
+  "月亮始终朝向地球的一面，我们从未见过背面。",
+  "一个月球日（从日出到下一次日出）大约等于29.5个地球日。",
+  "月亮正以每年约3.8厘米的速度远离地球。",
+  "月球上没有大气层，所以天空总是黑色的。",
+  "阿波罗宇航员留下的脚印至今仍然清晰可见。",
+  "月全食只能发生在满月期间。",
+  "月亮的直径大约是地球的四分之一。",
+  "“蓝月亮”指的是一个月中出现的第二次满月。",
+  "古代历法常常基于月亮的周期来制定。",
+  "月球背面的陨石坑比正面更多。"
+];
+
+// --- State ---
+let currentDate = new Date();
+let useMoonIcons = true;
+
+// --- DOM refs ---
+const toolbar = document.getElementById('toolbar');
+const heroMoon = document.getElementById('heroMoon');
+const heroBadges = document.getElementById('heroBadges');
+const phaseName = document.getElementById('phaseName');
+const illumRow = document.getElementById('illumRow');
+const ageRow = document.getElementById('ageRow');
+const mainMoon = document.getElementById('mainMoon');
+const miniStrip = document.getElementById('miniStrip');
+const dateInput = document.getElementById('dateInput');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const langBtn = document.getElementById('langBtn');
+const factsGrid = document.getElementById('factsGrid');
+const factsTitle = document.getElementById('factsTitle');
+const toggleMoonIcons = document.getElementById('toggleMoonIcons');
+
+// --- Toolbar renderers ---
+function renderSystemIcons() {
+  toolbar.innerHTML = '';
+  const icons = [
+    {title:'Home', href:'#home', svg:'<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10.5 12 3l9 7.5"/><path d="M9 22V12h6v10"/></svg>'},
+    {title:'Search', href:'#interactive', svg:'<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>'},
+    {title:'Moon', href:'#facts', svg:'<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>'},
+    {title:'Settings', href:'#home', svg:'<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V22a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H2a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06A2 2 0 1 1 6.04 3.3l.06.06a1.65 1.65 0 0 0 1.82.33H8a1.65 1.65 0 0 0 1-1.51V2a2 2 0 1 1 4 0v.09c0 .66.39 1.26 1 1.51h.08c.62.24 1.31.09 1.82-.33l.06-.06A2 2 0 1 1 20.3 6.04l-.06.06c-.42.51-.57 1.2-.33 1.82V8c.24.62.84 1 1.51 1H22a2 2 0 1 1 0 4h-.09c-.66 0-1.26.39-1.51 1z"/></svg>'},
+  ];
+  icons.forEach(ic => {
+    const a = document.createElement('a');
+    a.href = ic.href;
+    a.innerHTML = ic.svg;
+    a.title = ic.title;
+    a.className = 'hover:text-yellow-300';
+    toolbar.appendChild(a);
+  });
+}
+function renderMoonIcons() {
+  toolbar.innerHTML = '';
+  const targets = [
+    {offset:0, target:'home'},
+    {offset:3, target:'interactive'},
+    {offset:7, target:'interactive'},
+    {offset:11, target:'facts'},
+    {offset:15, target:'facts'},
+  ];
+  targets.forEach(t => {
+    const date = addDays(new Date(), t.offset);
+    const el = liveMoonEl(date, 36, -10);
+    el.classList.add('cursor-pointer');
+    el.onclick = () => document.getElementById(t.target)?.scrollIntoView({behavior:'smooth'});
+    toolbar.appendChild(el);
+  });
+}
+function renderToolbar(){
+  useMoonIcons ? renderMoonIcons() : renderSystemIcons();
+}
+
+// --- Render Fun Facts ---
+function renderFacts(){
+  const facts = (lang === 'en') ? funFactsEN : funFactsCN;
+  factsGrid.innerHTML = '';
+  facts.forEach(f => {
+    const card = document.createElement('div');
+    card.className = 'rounded-2xl shadow-lg border border-gray-200 bg-white p-6';
+    const p = document.createElement('p');
+    p.className = 'text-slate-700';
+    p.textContent = f;
+    card.appendChild(p);
+    factsGrid.appendChild(card);
+  });
+  factsTitle.textContent = (lang === 'en') ? '10 Fun Facts about the Moon' : '关于月亮的10个趣闻';
+}
+
+// --- Render Hero + Interactive ---
+function renderAll(){
+  // hero badges
+  const info = phaseInfo(currentDate);
+  heroBadges.innerHTML = '';
+  const b1 = document.createElement('span'); b1.className='inline-block rounded-full bg-indigo-50 text-indigo-700 px-3 py-1'; b1.textContent = (lang==='en')?info.nameEN:info.nameCN; heroBadges.appendChild(b1);
+  const b2 = document.createElement('span'); b2.className='inline-block rounded-full bg-indigo-50 text-indigo-700 px-3 py-1'; b2.textContent = (lang==='en')? (fmtPct(info.illumination)+' illuminated') : (fmtPct(info.illumination)+' 被照亮'); heroBadges.appendChild(b2);
+  const b3 = document.createElement('span'); b3.className='inline-block rounded-full bg-indigo-50 text-indigo-700 px-3 py-1'; b3.textContent = ((lang==='en')?'Age: ':'月龄: ')+info.age.toFixed(1)+' d'; heroBadges.appendChild(b3);
+
+  // hero moon
+  heroMoon.innerHTML = '';
+  heroMoon.appendChild(liveMoonEl(currentDate, 260, -12));
+
+  // interactive main moon
+  mainMoon.innerHTML = '';
+  const mwrap = document.createElement('div');
+  mwrap.className = 'flex items-center gap-6';
+  const moon = liveMoonEl(currentDate, 180, -12);
+  mwrap.appendChild(moon);
+  mainMoon.appendChild(mwrap);
+
+  // text
+  phaseName.textContent = (lang==='en') ? info.nameEN : info.nameCN;
+  illumRow.textContent = (lang==='en') ? ('Illumination: '+fmtPct(info.illumination)) : ('被照亮: '+fmtPct(info.illumination));
+  ageRow.textContent = (lang==='en') ? ('Age since New Moon: '+info.age.toFixed(2)+' days') : ('距新月的月龄: '+info.age.toFixed(2)+' 天');
+
+  // date input
+  const yyyy = currentDate.getFullYear();
+  const mm = String(currentDate.getMonth()+1).padStart(2,'0');
+  const dd = String(currentDate.getDate()).padStart(2,'0');
+  dateInput.value = `${yyyy}-${mm}-${dd}`;
+
+  // mini strip ±15
+  miniStrip.innerHTML = '';
+  for (let i=0;i<31;i++){
+    const offset = i-15;
+    const d2 = addDays(currentDate, offset);
+    const cell = document.createElement('button');
+    cell.className = 'group rounded-xl border p-1 hover:shadow-sm active:scale-95';
+    const inner = document.createElement('div');
+    inner.className = 'flex flex-col items-center';
+    inner.appendChild(liveMoonEl(d2, 54, -8));
+    const lab = document.createElement('span');
+    lab.className = 'text-[10px] text-slate-500 mt-1';
+    lab.textContent = offset;
+    inner.appendChild(lab);
+    cell.appendChild(inner);
+    cell.onclick = () => { currentDate = d2; renderAll(); };
+    miniStrip.appendChild(cell);
+  }
+
+  // hero text per lang
+  document.getElementById('heroTitleA').textContent = (lang==='en')?'Understand ':'了解';
+  document.getElementById('heroTitleB').textContent = (lang==='en')?'Moon Phases':'月相';
+  document.getElementById('heroSub').textContent = (lang==='en')
+    ? 'A friendly, interactive guide to how and why the Moon changes shape in our sky.'
+    : '一个友好的互动指南，帮助理解月亮为何在天空中变化形状。';
+}
+
+// --- Events ---
+prevBtn.onclick = () => { currentDate = addDays(currentDate, -1); renderAll(); };
+nextBtn.onclick = () => { currentDate = addDays(currentDate, 1); renderAll(); };
+dateInput.onchange = (e) => { const d = new Date(e.target.value); if (!isNaN(d)) { currentDate = d; renderAll(); } };
+langBtn.onclick = () => {
+  lang = (lang === 'en') ? 'cn' : 'en';
+  langBtn.textContent = (lang === 'en') ? '中文' : 'EN';
+  renderFacts(); renderAll();
+};
+toggleMoonIcons.onchange = (e) => { useMoonIcons = e.target.checked; renderToolbar(); };
+
+// initial render
+renderToolbar();
+renderFacts();
+renderAll();
+</script>
+</body>
+</html>
